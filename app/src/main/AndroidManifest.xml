@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.jeanwest.mobile">
+
+    <uses-feature android:name="android.hardware.camera.any" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application
+        android:allowBackup="true"
+        android:fullBackupContent="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Handheld"
+        android:usesCleartextTraffic="true">
+
+        <service android:name="com.jeanwest.mobile.iotHub.IotHub" />
+
+        <activity
+            android:name="com.jeanwest.mobile.count.CountActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.ms-excel" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name="com.jeanwest.mobile.manualRefill.SendManualRefillToStoreActivity" />
+        <activity android:name="com.jeanwest.mobile.manualRefill.AddProductToManualRefillListActivityActivity" />
+        <activity android:name="com.jeanwest.mobile.checkOut.CheckOutActivity" />
+        <activity android:name="com.jeanwest.mobile.checkOut.SendToDestinationActivity" />
+        <activity android:name="com.jeanwest.mobile.checkIn.ConfirmCheckInsActivity" />
+        <activity android:name="com.jeanwest.mobile.manualRefill.ManualRefillActivity" />
+        <activity android:name="com.jeanwest.mobile.refill.SendRefillToStoreActivity" />
+        <activity android:name="com.jeanwest.mobile.refill.RefillActivity" />
+        <activity android:name="com.jeanwest.mobile.logIn.OperatorLoginActivity" />
+        <activity android:name="com.jeanwest.mobile.checkIn.CheckInActivity" />
+        <activity android:name="com.jeanwest.mobile.checkIn.GetBarcodesByCheckInNumberActivity" />
+        <activity android:name="com.jeanwest.mobile.logIn.UserLoginActivity" />
+        <activity android:name="com.jeanwest.mobile.search.SearchSubActivity" />
+        <activity android:name="com.jeanwest.mobile.search.SearchActivity" />
+        <activity android:name="com.jeanwest.mobile.logIn.DeviceRegisterActivity" />
+        <activity android:name="com.jeanwest.mobile.updateActivity.UpdateActivity" />
+        <activity android:name="com.jeanwest.mobile.write.WriteActivity" />
+        <activity
+            android:name="com.jeanwest.mobile.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Handheld">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths" />
+        </provider>
+    </application>
+
+</manifest>
