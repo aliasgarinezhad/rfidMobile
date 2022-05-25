@@ -168,7 +168,7 @@ class ManualRefillActivityTest {
     private fun clearUserData() {
 
         manualRefillActivity.activity.scannedProducts.forEach {
-            manualRefillActivity.activity.signedProductCodes.add(it.KBarCode)
+            manualRefillActivity.activity.selectedProductCodes.add(it.KBarCode)
         }
         manualRefillActivity.activity.clear()
 

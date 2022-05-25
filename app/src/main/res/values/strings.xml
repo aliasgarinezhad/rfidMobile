@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">RFID Store</string>
+    <string name="app_name">Store app</string>
     <string name="transferText">ثبت حواله</string>
     <string name="manualRefill">شارژ</string>
     <string name="checkOut">ثبت حواله</string>
@@ -9,5 +9,4 @@
     <string name="xls">application/vnd.ms-excel</string>
     <string name="EXARK">EXARKXK650</string>
     <string name="chainway">c72</string>
-
 </resources>

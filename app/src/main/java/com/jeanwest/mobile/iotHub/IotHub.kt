@@ -1,6 +1,5 @@
 package com.jeanwest.mobile.iotHub
 
-import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
@@ -9,7 +8,6 @@ import android.util.Log
 import androidx.preference.PreferenceManager
 import com.azure.storage.blob.BlobClientBuilder
 import com.jeanwest.mobile.updateActivity.UpdateActivity
-import com.jeanwest.mobile.write.WriteRecord
 import com.microsoft.azure.sdk.iot.deps.serializer.FileUploadCompletionNotification
 import com.microsoft.azure.sdk.iot.deps.serializer.FileUploadSasUriRequest
 import com.microsoft.azure.sdk.iot.device.*
@@ -18,12 +16,8 @@ import com.microsoft.azure.sdk.iot.device.DeviceTwin.Property
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
-import org.apache.poi.ss.usermodel.Sheet
-import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
-import java.text.SimpleDateFormat
 import java.util.*
 
 class IotHub : Service() {
@@ -112,36 +106,6 @@ class IotHub : Service() {
 
     override fun onBind(intent: Intent): IBinder {
         return binder
-    }
-
-    fun sendWriteLog(writeRecords: List<WriteRecord>): Boolean {
-        val workbook = XSSFWorkbook()
-        val sheet: Sheet = workbook.createSheet("کالا های رایت شده")
-        val headerRow = sheet.createRow(sheet.physicalNumberOfRows)
-        headerRow.createCell(0).setCellValue("barcode")
-        headerRow.createCell(1).setCellValue("EPC")
-        headerRow.createCell(2).setCellValue("date and time")
-        headerRow.createCell(3).setCellValue("username")
-        headerRow.createCell(4).setCellValue("device serial number")
-        headerRow.createCell(5).setCellValue("wrote on raw tag")
-        @SuppressLint("SimpleDateFormat") val sdf =
-            SimpleDateFormat("yyyy.MM.dd'T'HH:mm:ssZ", Locale.ENGLISH)
-        val dir = File(getExternalFilesDir(null), "/")
-        val outFile = File(dir, "log" + sdf.format(Date()) + ".xlsx")
-        for ((epc, barcode, dateAndTime, username, deviceSerialNumber, wroteOnRawTag) in writeRecords) {
-            val row = sheet.createRow(sheet.physicalNumberOfRows)
-            row.createCell(0).setCellValue(barcode)
-            row.createCell(1).setCellValue(epc)
-            row.createCell(2).setCellValue(dateAndTime)
-            row.createCell(3).setCellValue(username)
-            row.createCell(4).setCellValue(deviceSerialNumber)
-            row.createCell(5).setCellValue(wroteOnRawTag)
-            val outputStream = FileOutputStream(outFile.absolutePath)
-            workbook.write(outputStream)
-            outputStream.flush()
-            outputStream.close()
-        }
-        return sendFile(outFile)
     }
 
     fun sendFile(outFile: File) : Boolean {

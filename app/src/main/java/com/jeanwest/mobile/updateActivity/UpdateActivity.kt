@@ -31,14 +31,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.jeanwest.mobile.R
 import com.jeanwest.mobile.iotHub.IotHub
-import com.rscja.deviceapi.RFIDWithUHFUART
 import com.jeanwest.mobile.theme.MyApplicationTheme
 import java.io.File
 
 
 class UpdateActivity : ComponentActivity() {
 
-    private lateinit var rf: RFIDWithUHFUART
     private var isDownloading = mutableStateOf(false)
     private var openDialog = mutableStateOf(false)
     private var downLoadId = 0L
@@ -46,14 +44,6 @@ class UpdateActivity : ComponentActivity() {
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        try {
-            rf = RFIDWithUHFUART.getInstance()
-        } catch (e : Exception) {
-            e.printStackTrace()
-        }
-        rf.stopInventory()
-        rf.free()
 
         Toast.makeText(
             applicationContext,

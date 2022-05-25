@@ -25,8 +25,8 @@ fun ErrorSnackBar(state: SnackbarHostState) {
                 action = {
                     Text(
                         text = "باشه",
-                        color = MaterialTheme.colors.secondary,
-                        style = MaterialTheme.typography.h2,
+                        color = JeanswestButtonDisabled,
+                        style = MaterialTheme.typography.body1,
                         modifier = Modifier
                             .padding(end = 16.dp)
                             .clickable {
@@ -37,8 +37,8 @@ fun ErrorSnackBar(state: SnackbarHostState) {
             ) {
                 Text(
                     text = state.currentSnackbarData?.message ?: "",
-                    color = MaterialTheme.colors.error,
-                    style = MaterialTheme.typography.h2,
+                    color = errorColor,
+                    style = MaterialTheme.typography.body1,
                 )
             }
         })

@@ -12,10 +12,6 @@ data class ManualRefillProduct(
     var salePrice: String,
     var rfidKey: Long,
     var wareHouseNumber: Int,
-    var scannedEPCs: MutableList<String>,
-    var scannedBarcode: String,
-    var scannedBarcodeNumber : Int,
-    var scannedEPCNumber : Int,
     var kName: String,
     var requestedNum : Int,
     var storeNumber : Int
