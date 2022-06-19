@@ -22,6 +22,11 @@ val Typography = Typography(
         fontSize = 14.sp,
         color = Color(0xFF272727),
         ),
+    h1 = TextStyle(
+        fontFamily = FontFamily(Font(R.font.sans_regular)),
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+    ),
     h3 = TextStyle(
         fontFamily = FontFamily(Font(R.font.sans_regular)),
         fontWeight = FontWeight.Normal,

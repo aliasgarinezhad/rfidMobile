@@ -20,16 +20,10 @@
         android:theme="@style/Theme.Handheld"
         android:usesCleartextTraffic="true">
 
-        <service android:name="com.jeanwest.mobile.iotHub.IotHub" />
-
-        <activity android:name="com.jeanwest.mobile.manualRefill.AddProductToManualRefillListActivityActivity" />
-        <activity android:name="com.jeanwest.mobile.manualRefill.ManualRefillActivity" />
-        <activity android:name="com.jeanwest.mobile.logIn.OperatorLoginActivity" />
         <activity android:name="com.jeanwest.mobile.logIn.UserLoginActivity" />
-        <activity android:name="com.jeanwest.mobile.logIn.DeviceRegisterActivity" />
         <activity android:name="com.jeanwest.mobile.updateActivity.UpdateActivity" />
         <activity
-            android:name="com.jeanwest.mobile.MainActivity"
+            android:name="com.jeanwest.mobile.manualRefill.ManualRefillActivity"
             android:exported="true"
             android:theme="@style/Theme.Handheld">
             <intent-filter>

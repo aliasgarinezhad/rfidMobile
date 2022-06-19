@@ -1,82 +1,145 @@
 package com.jeanwest.mobile.manualRefill
 
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.BottomCenter
+import androidx.compose.ui.Alignment.Companion.BottomStart
+import androidx.compose.ui.Alignment.Companion.Center
+import androidx.compose.ui.Alignment.Companion.TopCenter
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
-import coil.annotation.ExperimentalCoilApi
-import coil.compose.rememberImagePainter
 import com.android.volley.NoConnectionError
 import com.android.volley.toolbox.JsonArrayRequest
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.jeanwest.mobile.MainActivity
 import com.jeanwest.mobile.R
+import com.jeanwest.mobile.logIn.UserLoginActivity
 import com.jeanwest.mobile.theme.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
-@OptIn(ExperimentalFoundationApi::class)
 class ManualRefillActivity : ComponentActivity() {
 
-    //ui parameters
+    private var fullName = ""
+    private var username = ""
+    private var token = ""
+
+    //charge ui parameters
     private var isDataLoading by mutableStateOf(false)
-    private var openClearDialog by mutableStateOf(false)
-    var selectedProductCodes = mutableListOf<String>()
     private var state = SnackbarHostState()
     var uiList = mutableStateListOf<ManualRefillProduct>()
-    private var selectMode by mutableStateOf(false)
     private var sumOfManualRefill by mutableStateOf(0)
     private var isSubmitting by mutableStateOf(false)
+    private var isSubmitSelected by mutableStateOf(false)
+    private var manualRefillProducts = mutableListOf<ManualRefillProduct>()
 
-
-    companion object {
-        var manualRefillProducts = ArrayList<ManualRefillProduct>()
-    }
+    // search ui parameters
+    private var productCode by mutableStateOf("")
+    private var searchUiList = mutableStateListOf<ManualRefillProduct>()
+    private var filteredUiList = mutableStateListOf<ManualRefillProduct>()
+    private var colorFilterValues = mutableStateListOf("همه رنگ ها")
+    private var sizeFilterValues = mutableStateListOf("همه سایز ها")
+    private var colorFilterValue by mutableStateOf("همه رنگ ها")
+    private var sizeFilterValue by mutableStateOf("همه سایز ها")
+    private var storeFilterValue = 0
+    private val beep: ToneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+    private var isCameraOn by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
             Page()
         }
-
         loadMemory()
+
+        if (username == "") {
+            val intent =
+                Intent(this, UserLoginActivity::class.java)
+            intent.flags += Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+        }
+        checkPermission()
+        clearCash()
     }
 
-    override fun onResume() {
-        super.onResume()
-        uiList.clear()
-        uiList.addAll(manualRefillProducts)
-        sumOfManualRefill = 0
-        uiList.forEach {
-            sumOfManualRefill += it.requestedNum
+    private fun clearCash() {
+        deleteRecursive(cacheDir)
+        deleteRecursive(codeCacheDir)
+    }
+
+    private fun deleteRecursive(fileOrDirectory: File) {
+        if (fileOrDirectory.isDirectory) {
+            fileOrDirectory.listFiles()?.let {
+                for (child in it) {
+                    deleteRecursive(child)
+                }
+            }
         }
-        saveToMemory()
+        fileOrDirectory.delete()
+    }
+
+    private fun checkPermission() {
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ),
+                0
+            )
+        }
     }
 
     private fun sendManualRefillRequest() {
@@ -84,7 +147,7 @@ class ManualRefillActivity : ComponentActivity() {
         if (sumOfManualRefill == 0) {
             CoroutineScope(Dispatchers.Default).launch {
                 state.showSnackbar(
-                    "لیست شارژ خالی است.",
+                    "هنوز کالایی برای شارژ انتخاب نکرده اید",
                     null,
                     SnackbarDuration.Long
                 )
@@ -149,7 +212,7 @@ class ManualRefillActivity : ComponentActivity() {
                 val params = HashMap<String, String>()
                 params["Content-Type"] = "application/json;charset=UTF-8"
                 params["Authorization"] =
-                    "Bearer " + MainActivity.token
+                    "Bearer $token"
                 return params
             }
 
@@ -173,7 +236,6 @@ class ManualRefillActivity : ComponentActivity() {
         val queue = Volley.newRequestQueue(this)
         queue.add(request)
     }
-
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
 
@@ -202,198 +264,503 @@ class ManualRefillActivity : ComponentActivity() {
 
         val type = object : TypeToken<List<ManualRefillProduct>>() {}.type
 
+        username = memory.getString("username", "") ?: ""
+        token = memory.getString("accessToken", "") ?: ""
+        fullName = memory.getString("userFullName", "") ?: ""
+
+        storeFilterValue = memory.getInt("userLocationCode", 0)
+
         manualRefillProducts = Gson().fromJson(
             memory.getString("ManualRefillProducts", ""),
             type
         ) ?: ArrayList()
-    }
 
-    fun clear() {
-
-        val removedRefillProducts = mutableListOf<ManualRefillProduct>()
-
-        manualRefillProducts.forEach {
-            if (it.KBarCode in selectedProductCodes) {
-                removedRefillProducts.add(it)
-            }
-        }
-        manualRefillProducts.removeAll(removedRefillProducts)
-        removedRefillProducts.clear()
-
-        uiList.clear()
         uiList.addAll(manualRefillProducts)
-
         sumOfManualRefill = 0
         uiList.forEach {
             sumOfManualRefill += it.requestedNum
         }
-        selectMode = false
-        selectedProductCodes = mutableListOf()
+    }
+
+
+    private fun addToRefillList(KBarCode: String) {
+
+        val productIndexInUiList = searchUiList.indexOfLast {
+            it.KBarCode == KBarCode
+        }
+
+        manualRefillProducts.forEach {
+            if (searchUiList[productIndexInUiList].KBarCode == it.KBarCode) {
+                if (it.requestedNum >= it.wareHouseNumber) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        state.showSnackbar(
+                            "تعداد درخواستی از موجودی انبار بیشتر است.",
+                            null,
+                            SnackbarDuration.Long,
+                        )
+                    }
+                    return
+                } else {
+                    it.requestedNum++
+                    filterUiList()
+                    saveToMemory()
+                    return
+                }
+            }
+        }
+
+        if (searchUiList[productIndexInUiList].wareHouseNumber == 0) {
+            CoroutineScope(Dispatchers.Main).launch {
+                state.showSnackbar(
+                    "تعداد درخواستی از موجودی انبار بیشتر است.",
+                    null,
+                    SnackbarDuration.Long,
+                )
+            }
+            return
+        }
+
+        manualRefillProducts.add(searchUiList[productIndexInUiList])
+        manualRefillProducts[manualRefillProducts.indexOfLast {
+            it.KBarCode == KBarCode
+        }].requestedNum++
+
+        filterUiList()
         saveToMemory()
+    }
+
+    private fun filterUiList() {
+
+        searchUiList.forEach {
+            var isRequested = false
+            manualRefillProducts.forEach { it1 ->
+                if (it.KBarCode == it1.KBarCode) {
+                    it.requestedNum = it1.requestedNum
+                    isRequested = true
+                }
+            }
+            if (!isRequested) {
+                it.requestedNum = 0
+            }
+        }
+
+        /*val wareHouseFilterOutput = searchUiList.filter {
+            it.wareHouseNumber > 0
+        }*/
+
+        val sizeFilterOutput = if (sizeFilterValue == "همه سایز ها") {
+            searchUiList
+        } else {
+            searchUiList.filter {
+                it.size == sizeFilterValue
+            }
+        }
+
+        val colorFilterOutput = if (colorFilterValue == "همه رنگ ها") {
+            sizeFilterOutput
+        } else {
+            sizeFilterOutput.filter {
+                it.color == colorFilterValue
+            }
+        }
+        filteredUiList.clear()
+        filteredUiList.addAll(colorFilterOutput)
+        sumOfManualRefill = 0
+        uiList.clear()
+        uiList.addAll(manualRefillProducts)
+        uiList.forEach {
+            sumOfManualRefill += it.requestedNum
+        }
+    }
+
+    private fun getSimilarProducts() {
+
+        if (productCode == "کد محصول") {
+            CoroutineScope(Dispatchers.Default).launch {
+                state.showSnackbar(
+                    "لطفا کد محصول را وارد کنید.",
+                    null,
+                    SnackbarDuration.Long
+                )
+            }
+        }
+
+        isDataLoading = true
+
+        searchUiList.clear()
+        filteredUiList.clear()
+        colorFilterValues = mutableStateListOf("همه رنگ ها")
+        sizeFilterValues = mutableStateListOf("همه سایز ها")
+
+        val url1 =
+            "https://rfid-api.avakatan.ir/products/similars?DepartmentInfo_ID=$storeFilterValue&K_Bar_Code=$productCode"
+
+        val request1 = JsonObjectRequest(url1, { response1 ->
+
+            val products = response1.getJSONArray("products")
+
+            if (products.length() > 0) {
+                jsonArrayProcess(products)
+                isDataLoading = false
+            } else {
+
+                val url2 =
+                    "https://rfid-api.avakatan.ir/products/similars?DepartmentInfo_ID=$storeFilterValue&kbarcode=$productCode"
+
+                val request2 = JsonObjectRequest(url2, { response2 ->
+
+                    val products2 = response2.getJSONArray("products")
+
+                    if (products2.length() > 0) {
+                        jsonArrayProcess(products2)
+                    }
+                    isDataLoading = false
+                }, { it2 ->
+                    when (it2) {
+                        is NoConnectionError -> {
+                            CoroutineScope(Dispatchers.Default).launch {
+                                state.showSnackbar(
+                                    "اینترنت قطع است. شبکه وای فای را بررسی کنید.",
+                                    null,
+                                    SnackbarDuration.Long
+                                )
+                            }
+                        }
+                        else -> {
+                            CoroutineScope(Dispatchers.Default).launch {
+                                state.showSnackbar(
+                                    it2.toString(),
+                                    null,
+                                    SnackbarDuration.Long
+                                )
+                            }
+                        }
+                    }
+                    isDataLoading = false
+                })
+                val queue2 = Volley.newRequestQueue(this)
+                queue2.add(request2)
+            }
+        }, {
+            when (it) {
+                is NoConnectionError -> {
+                    CoroutineScope(Dispatchers.Default).launch {
+                        state.showSnackbar(
+                            "اینترنت قطع است. شبکه وای فای را بررسی کنید.",
+                            null,
+                            SnackbarDuration.Long
+                        )
+                    }
+                }
+                else -> {
+                    CoroutineScope(Dispatchers.Default).launch {
+                        state.showSnackbar(
+                            it.toString(),
+                            null,
+                            SnackbarDuration.Long
+                        )
+                    }
+                }
+            }
+            isDataLoading = false
+        })
+
+        val queue = Volley.newRequestQueue(this)
+        queue.add(request1)
+    }
+
+    private fun jsonArrayProcess(similarProductsJsonArray: JSONArray) {
+
+        for (i in 0 until similarProductsJsonArray.length()) {
+
+            val json = similarProductsJsonArray.getJSONObject(i)
+
+            colorFilterValues.add(json.getString("Color"))
+            sizeFilterValues.add(json.getString("Size"))
+
+            val product = ManualRefillProduct(
+                name = json.getString("productName"),
+                KBarCode = json.getString("KBarCode"),
+                imageUrl = json.getString("ImgUrl"),
+                wareHouseNumber = json.getInt("dbCountDepo"),
+                productCode = json.getString("K_Bar_Code"),
+                size = json.getString("Size"),
+                color = json.getString("Color"),
+                originalPrice = json.getString("OrigPrice"),
+                salePrice = json.getString("SalePrice"),
+                primaryKey = json.getLong("BarcodeMain_ID"),
+                rfidKey = json.getLong("RFID"),
+                kName = json.getString("K_Name"),
+                requestedNum = 0,
+                storeNumber = json.getInt("dbCountStore"),
+            )
+            searchUiList.add(product)
+        }
+
+        colorFilterValues = colorFilterValues.distinct().toMutableStateList()
+        sizeFilterValues = sizeFilterValues.distinct().toMutableStateList()
+
+        getScannedProductProperties()
+    }
+
+    private fun getScannedProductProperties() {
+
+        isDataLoading = true
+
+        val url = "https://rfid-api.avakatan.ir/products/v4"
+
+        val request = object : JsonObjectRequest(Method.POST, url, null, {
+
+            val barcodes = it.getJSONArray("KBarCodes")
+            if (barcodes.length() != 0) {
+                colorFilterValue = barcodes.getJSONObject(0).getString("Color")
+            }
+            productCode = searchUiList[0].productCode
+            filterUiList()
+            isDataLoading = false
+
+        }, {
+            when (it) {
+                is NoConnectionError -> {
+
+                    CoroutineScope(Dispatchers.Default).launch {
+                        state.showSnackbar(
+                            "اینترنت قطع است. شبکه وای فای را بررسی کنید.",
+                            null,
+                            SnackbarDuration.Long
+                        )
+                    }
+                }
+                else -> {
+                    CoroutineScope(Dispatchers.Default).launch {
+                        state.showSnackbar(
+                            it.toString(),
+                            null,
+                            SnackbarDuration.Long
+                        )
+                    }
+                }
+            }
+            isDataLoading = false
+
+        }) {
+            override fun getHeaders(): MutableMap<String, String> {
+                val params = HashMap<String, String>()
+                params["Content-Type"] = "application/json;charset=UTF-8"
+                params["Authorization"] = "Bearer $token"
+                return params
+            }
+
+            override fun getBody(): ByteArray {
+                val json = JSONObject()
+                val epcArray = JSONArray()
+                val barcodeArray = JSONArray()
+
+                barcodeArray.put(productCode)
+
+                json.put("epcs", epcArray)
+                json.put("KBarCodes", barcodeArray)
+                return json.toString().toByteArray()
+            }
+        }
+
+        val queue = Volley.newRequestQueue(this)
+        queue.add(request)
     }
 
     private fun back() {
 
-        if (selectMode) {
-            selectedProductCodes = mutableListOf()
-            selectMode = false
-            uiList.clear()
-            uiList.addAll(manualRefillProducts)
+        if (isCameraOn) {
+            isCameraOn = false
         } else {
             saveToMemory()
             finish()
         }
     }
 
-    @ExperimentalCoilApi
-    @ExperimentalFoundationApi
     @Composable
     fun Page() {
         MyApplicationTheme {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 Scaffold(
-                    topBar = { AppBar() },
-                    bottomBar = { if (selectMode) SelectedBottomAppBar() else BottomBar() },
-                    content = { Content() },
+                    bottomBar = { BottomBar() },
+                    content = {
+                        if (isSubmitSelected) {
+                            Content()
+                        } else {
+                            SearchContent()
+                        }
+                    },
                     snackbarHost = { ErrorSnackBar(state) },
+                    floatingActionButton = {
+                        if (!isSubmitSelected) {
+                            BarcodeScanButton()
+                        }
+                    },
+                    floatingActionButtonPosition = if (!isSubmitSelected) {
+                        FabPosition.Center
+                    } else {
+                        FabPosition.End
+                    },
                 )
             }
         }
     }
 
     @Composable
-    fun SelectedBottomAppBar() {
-        BottomAppBar(
-            backgroundColor = JeanswestBottomBar,
-            modifier = Modifier
-                .wrapContentHeight()
-                .background(shape = MaterialTheme.shapes.large, color = JeanswestBottomBar),
-        ) {
+    fun SendRequestButton() {
 
-            Column {
+        Box(modifier = Modifier.fillMaxSize()) {
 
-                Row(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Button(onClick = {
-                        uiList.forEach {
-                            selectedProductCodes.add(it.KBarCode)
+            Box(
+                modifier = Modifier
+                    .padding(bottom = 56.dp)
+                    .shadow(6.dp, RoundedCornerShape(0.dp))
+                    .background(Color.White, RoundedCornerShape(0.dp))
+                    .height(100.dp)
+                    .align(BottomCenter),
+            ) {
+
+                Button(modifier = Modifier
+                    .padding(start = 16.dp, end = 16.dp)
+                    .align(Center)
+                    .fillMaxWidth()
+                    .align(Center),
+                    enabled = !isSubmitting,
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = Jeanswest,
+                        disabledBackgroundColor = DisableButtonColor,
+                        disabledContentColor = Color.White
+                    ),
+                    onClick = {
+                        if (!isSubmitting) {
+                            sendManualRefillRequest()
                         }
-                        uiList.clear()
-                        uiList.addAll(manualRefillProducts)
                     }) {
-                        Text(text = "انتخاب همه")
-                    }
-                    Button(onClick = {
-                        openClearDialog = true
-                    }) {
-                        Text(text = "پاک کردن")
-                    }
-                    Button(onClick = {
-                        selectedProductCodes.clear()
-                        selectMode = false
-                        uiList.clear()
-                        uiList.addAll(manualRefillProducts)
-                    }) {
-                        Text(text = "بازگشت")
-                    }
+                    Text(
+                        text = if (isSubmitting) "در حال ارسال درخواست" else "ارسال درخواست به انباردار",
+                        style = Typography.body1,
+                        modifier = Modifier.padding(8.dp)
+                    )
                 }
+            }
+        }
+    }
+
+    @Composable
+    fun BarcodeScanButton() {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Button(modifier = Modifier
+                .align(BottomStart)
+                .padding(start = 16.dp), onClick = {
+                isCameraOn = true
+            }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_barcode_scan),
+                    contentDescription = "",
+                    modifier = Modifier
+                        .size(36.dp)
+                        .padding(end = 8.dp)
+                )
+                Text(
+                    text = "اسکن کالای جدید",
+                    style = Typography.h1
+                )
             }
         }
     }
 
     @Composable
     fun BottomBar() {
-        BottomAppBar(
-            backgroundColor = JeanswestBottomBar,
-            modifier = Modifier
-                .wrapContentHeight(),
-            //.background(shape = MaterialTheme.shapes.large, color = JeanswestBottomBar),
-        ) {
 
-            Column {
+        BottomNavigation(backgroundColor = BottomBar) {
+            BottomNavigationItem(
+                selected = !isSubmitSelected,
+                onClick = {
+                    isSubmitSelected = false
+                    filterUiList()
+                },
+                selectedContentColor = Jeanswest,
+                unselectedContentColor = unselectedColor,
+                icon = {
 
-                Row(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-
-                    Text(
-                        text = "درخواست شارژ " + "(" + sumOfManualRefill + ")",
-                        textAlign = TextAlign.Right,
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.CenterVertically)
-                    )
-
-                    Button(onClick = {
-                        Intent(
-                            this@ManualRefillActivity,
-                            AddProductToManualRefillListActivityActivity::class.java
-                        ).apply {
-                            startActivity(this)
-                        }
-                    }) {
-                        Text(text = "تعریف شارژ")
+                            .height(30.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_add),
+                            contentDescription = "",
+                            modifier = Modifier
+                                .padding(top = 0.dp)
+                                .size(24.dp)
+                                .align(Center)
+                        )
                     }
-
-                    Button(onClick = {
-                        if(!isSubmitting) {
-                            sendManualRefillRequest()
-                        }
-                    }) {
-                        if(isSubmitting) {
-                            Text(text = "در حال ثبت ...")
-                        } else {
-                            Text(text = "ثبت شارژ")
-                        }
-                    }
+                },
+                label = {
+                    Text(text = "شارژ")
                 }
-            }
+            )
+
+            BottomNavigationItem(
+                selected = isSubmitSelected,
+                onClick = {
+                    isSubmitSelected = true
+                    uiList.clear()
+                    uiList.addAll(manualRefillProducts)
+                    sumOfManualRefill = 0
+                    uiList.forEach {
+                        sumOfManualRefill += it.requestedNum
+                    }
+                },
+                selectedContentColor = Jeanswest,
+                unselectedContentColor = unselectedColor,
+                icon = {
+                    Box(modifier = Modifier.height(30.dp)) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.submit),
+                            contentDescription = "",
+                            modifier = Modifier
+                                .padding(top = 2.dp)
+                                .size(24.dp)
+                                .align(Center)
+                        )
+                        if (sumOfManualRefill > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 0.dp, end = 24.dp)
+                                    .background(
+                                        shape = RoundedCornerShape(24.dp),
+                                        color = warningColor
+                                    )
+                                    .size(18.dp)
+                                    .align(TopCenter)
+                            ) {
+                                Text(
+                                    text = sumOfManualRefill.toString(),
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .align(Center),
+                                    style = Typography.caption,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    }
+                },
+                label = {
+                    Text(text = "ثبت درخواست")
+                }
+            )
         }
     }
 
     @Composable
-    fun AppBar() {
-
-        TopAppBar(
-
-            /*navigationIcon = {
-                IconButton(onClick = { back() }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_baseline_arrow_back_24),
-                        contentDescription = ""
-                    )
-                }
-            },
-*/
-            title = {
-                Text(
-                    text = "شارژ",
-                    modifier = Modifier
-                        //.padding(end = 50.dp)
-                        .fillMaxSize()
-                        .wrapContentSize(),
-                    textAlign = TextAlign.Center,
-                )
-            }
-        )
-    }
-
-    @ExperimentalCoilApi
-    @ExperimentalFoundationApi
-    @Composable
     fun Content() {
 
         Column {
-
-            if (openClearDialog) {
-                ClearAlertDialog()
-            }
 
             Column(
                 modifier = Modifier
@@ -405,205 +772,314 @@ class ManualRefillActivity : ComponentActivity() {
                     .fillMaxWidth()
             ) {
 
-                if (isDataLoading) {
-                    Row(
-                        modifier = Modifier
-                            .padding(32.dp)
-                            .fillMaxWidth(), horizontalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(color = MaterialTheme.colors.primary)
+                Text(
+                    "ثبت درخواست " + "(" + sumOfManualRefill + ")",
+                    style = Typography.h1,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Right,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(color = Background, shape = Shapes.small)
+                        .padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                )
+            }
 
-                        if (isDataLoading) {
-                            Text(
-                                text = "در حال بارگذاری",
-                                modifier = Modifier
-                                    .padding(start = 16.dp)
-                                    .align(Alignment.CenterVertically)
+            if (uiList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .padding(bottom = 56.dp)
+                        .fillMaxSize()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .align(Center)
+                            .width(256.dp)
+                    ) {
+                        Box(
+
+
+                            modifier = Modifier
+                                .background(color = Color.White, shape = Shapes.medium)
+                                .size(256.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_empty_box),
+                                contentDescription = "",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.align(Center)
                             )
                         }
+
+                        Text(
+                            "هنوز کالایی برای ثبت درخواست شارژ انتخاب نکرده اید",
+                            style = Typography.h1,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp),
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(modifier = Modifier.padding(top = 2.dp, bottom = 156.dp)) {
+
+                    items(uiList.size) { i ->
+                        LazyColumnItem(i)
                     }
                 }
             }
+        }
 
-            LazyColumn(modifier = Modifier.padding(top = 2.dp, bottom = 56.dp)) {
-
-                items(uiList.size) { i ->
-                    LazyColumnItem(i)
-                }
-            }
+        if (!uiList.isEmpty()) {
+            SendRequestButton()
         }
     }
 
-    @ExperimentalFoundationApi
     @Composable
     fun LazyColumnItem(i: Int) {
 
-        val topPadding = if(i==0) 16.dp else 0.dp
+        val topPaddingClearButton = if (i == 0) 8.dp else 4.dp
 
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = topPadding)
-                .shadow(elevation = 5.dp, shape = MaterialTheme.shapes.small)
-                .background(
-                    color = MaterialTheme.colors.onPrimary,
-                    shape = MaterialTheme.shapes.small
-                )
+        Box {
 
-                .fillMaxWidth()
-                .height(100.dp)
-                .combinedClickable(
-                    onClick = {
-                        if (selectMode) {
-                            if (uiList[i].KBarCode !in selectedProductCodes) {
-                                selectedProductCodes.add(uiList[i].KBarCode)
-                            } else {
-                                selectedProductCodes.remove(uiList[i].KBarCode)
-                                if (selectedProductCodes.size == 0) {
-                                    selectMode = false
-                                }
-                            }
-                            uiList.clear()
-                            uiList.addAll(manualRefillProducts)
-                        }
-                    },
-                    onLongClick = {
-                        selectMode = true
-                        if (uiList[i].KBarCode !in selectedProductCodes) {
-                            selectedProductCodes.add(uiList[i].KBarCode)
-                        } else {
-                            selectedProductCodes.remove(uiList[i].KBarCode)
-                            if (selectedProductCodes.size == 0) {
-                                selectMode = false
-                            }
-                        }
+            Item(i, uiList)
+
+            Box(
+                modifier = Modifier
+                    .padding(top = topPaddingClearButton, end = 8.dp)
+                    .background(
+                        shape = RoundedCornerShape(36.dp),
+                        color = deleteCircleColor
+                    )
+                    .size(30.dp)
+                    .align(Alignment.TopEnd)
+                    .clickable {
+
+                        manualRefillProducts.remove(uiList[i])
+                        saveToMemory()
                         uiList.clear()
                         uiList.addAll(manualRefillProducts)
-                    },
-                )
-                .testTag("refillItems"),
-        ) {
-
-            if (uiList[i].KBarCode in selectedProductCodes) {
+                        sumOfManualRefill = 0
+                        uiList.forEach {
+                            sumOfManualRefill += it.requestedNum
+                        }
+                    }
+            ) {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_baseline_check_circle_24),
-                    tint = doneColor,
+                    painter = painterResource(id = R.drawable.ic_baseline_clear_24),
                     contentDescription = "",
+                    tint = deleteColor,
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .align(Alignment.CenterVertically)
+                        .align(Center)
+                        .size(20.dp)
                 )
             }
+        }
+    }
 
-            Image(
-                painter = rememberImagePainter(
-                    uiList[i].imageUrl,
-                ),
-                contentDescription = "",
+    @Composable
+    fun SearchContent() {
+
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            Column(
                 modifier = Modifier
-                    .padding(end = 4.dp, top = 12.dp, bottom = 12.dp, start = 12.dp)
-                    .shadow(0.dp, shape = Shapes.large)
+                    .padding(bottom = 0.dp)
+                    .shadow(elevation = 6.dp, shape = MaterialTheme.shapes.large)
                     .background(
                         color = MaterialTheme.colors.onPrimary,
-                        shape = Shapes.large
+                        shape = MaterialTheme.shapes.large
                     )
-                    .border(
-                        BorderStroke(2.dp, color = JeanswestButtonDisabled),
-                        shape = Shapes.large
-                    )
-                    .fillMaxHeight()
-                    .width(70.dp)
-            )
-
-            Row(
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .fillMaxHeight()
+                    .fillMaxWidth(),
             ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1.5F)
-                        .fillMaxHeight()
-                        .padding(top = 16.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.SpaceEvenly
-                ) {
 
-                    Text(
-                        text = uiList[i].KBarCode,
-                        style = MaterialTheme.typography.body2,
-                        textAlign = TextAlign.Right,
-                    )
-                    Text(
-                        text = uiList[i].name,
-                        style = MaterialTheme.typography.h4,
-                        textAlign = TextAlign.Right,
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    ProductCodeTextField(
+                        modifier = Modifier
+                            .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 14.dp)
+                            .weight(1F)
+                            .fillMaxWidth(),
                     )
                 }
 
-                Column(
-                    modifier = Modifier
-                        .weight(1F)
-                        .fillMaxHeight()
-                        .padding(top = 16.dp, bottom = 16.dp),
-
-                    verticalArrangement = Arrangement.SpaceEvenly
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(
-                        text = "درخواستی: " + uiList[i].requestedNum,
-                        style = MaterialTheme.typography.h3,
-                        textAlign = TextAlign.Right,
+
+                    FilterDropDownList(
+                        modifier = Modifier
+                            .padding(start = 16.dp, bottom = 16.dp),
+                        icon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_baseline_color_lens_24),
+                                contentDescription = "",
+                                tint = iconColor,
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .padding(start = 4.dp)
+                            )
+                        },
+                        text = {
+                            Text(
+                                style = MaterialTheme.typography.body2,
+                                text = colorFilterValue,
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .padding(start = 4.dp)
+                            )
+                        },
+                        onClick = {
+                            colorFilterValue = it
+                            filterUiList()
+                        },
+                        values = colorFilterValues
                     )
-                    Text(
-                        text = "انبار: " + uiList[i].wareHouseNumber.toString(),
-                        style = MaterialTheme.typography.h3,
-                        textAlign = TextAlign.Right,
+
+                    FilterDropDownList(
+                        modifier = Modifier
+                            .padding(start = 16.dp, bottom = 16.dp),
+                        icon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.size),
+                                contentDescription = "",
+                                tint = iconColor,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .align(Alignment.CenterVertically)
+                                    .padding(start = 6.dp)
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = sizeFilterValue,
+                                style = MaterialTheme.typography.body2,
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .padding(start = 6.dp)
+                            )
+                        },
+                        onClick = {
+                            sizeFilterValue = it
+                            filterUiList()
+                        },
+                        values = sizeFilterValues
                     )
+                }
+            }
+
+            if (isDataLoading) {
+                Row(
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .fillMaxWidth(), horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colors.primary)
+
+                    if (isDataLoading) {
+                        Text(
+                            text = "در حال بارگذاری",
+                            modifier = Modifier
+                                .padding(start = 16.dp)
+                                .align(Alignment.CenterVertically)
+                        )
+                    }
+                }
+            }
+
+            BarcodeScannerWithCamera(isCameraOn, this@ManualRefillActivity) { barcodes ->
+                isCameraOn = false
+                productCode = barcodes[0].displayValue.toString()
+                beep.startTone(ToneGenerator.TONE_CDMA_PIP, 150)
+                getSimilarProducts()
+            }
+
+            if (filteredUiList.isEmpty()) {
+                EmptyList()
+            } else {
+                LazyColumn(modifier = Modifier.padding(top = 0.dp, bottom = 56.dp)) {
+
+                    items(filteredUiList.size) { i ->
+                        Item(i, filteredUiList, true) {
+                            addToRefillList(filteredUiList[i].KBarCode)
+                        }
+                    }
                 }
             }
         }
     }
 
     @Composable
-    fun ClearAlertDialog() {
+    fun ProductCodeTextField(
+        modifier: Modifier
+    ) {
 
-        AlertDialog(
-            onDismissRequest = {
-                openClearDialog = false
+        val focusManager = LocalFocusManager.current
+
+        OutlinedTextField(
+            textStyle = MaterialTheme.typography.body2,
+
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = ""
+                )
             },
-            buttons = {
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.SpaceAround
-                ) {
-
-                    Text(
-                        text = "شارژهایی که علامت زده اید پاک شوند؟",
-                        modifier = Modifier.padding(bottom = 10.dp),
-                        fontSize = 18.sp
-                    )
-
-                    Row(horizontalArrangement = Arrangement.SpaceAround) {
-
-                        Button(onClick = {
-                            openClearDialog = false
-                            clear()
-
-                        }, modifier = Modifier.padding(top = 10.dp, end = 20.dp)) {
-                            Text(text = "بله")
-                        }
-                        Button(
-                            onClick = { openClearDialog = false },
-                            modifier = Modifier.padding(top = 10.dp)
-                        ) {
-                            Text(text = "خیر")
-                        }
-                    }
-                }
-            }
+            value = productCode,
+            onValueChange = {
+                productCode = it
+            },
+            modifier = modifier
+                .testTag("SearchProductCodeTextField")
+                .background(
+                    color = MaterialTheme.colors.secondary,
+                    shape = MaterialTheme.shapes.small
+                ),
+            keyboardActions = KeyboardActions(onSearch = {
+                focusManager.clearFocus()
+                isCameraOn = false
+                getSimilarProducts()
+            }),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            colors = TextFieldDefaults.outlinedTextFieldColors(
+                unfocusedBorderColor = MaterialTheme.colors.secondary
+            ),
+            placeholder = { Text(text = "کد محصول") }
         )
+    }
+
+    @Composable
+    fun EmptyList() {
+        Box(
+            modifier = Modifier
+                .padding(bottom = 56.dp)
+                .fillMaxSize()
+        ) {
+            Column(
+                modifier = Modifier
+                    .align(Center)
+                    .width(256.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(color = Color.White, shape = Shapes.medium)
+                        .size(256.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_big_barcode_scan),
+                        contentDescription = "",
+                        tint = Color.Unspecified,
+                        modifier = Modifier
+                            .align(Center)
+                            .clickable { isCameraOn = true }
+                    )
+                }
+
+                Text(
+                    "بارکد را اسکن یا کد محصول را در کادر جستجو وارد کنید",
+                    style = Typography.h1,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp),
+                )
+            }
+        }
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -17,7 +18,7 @@ import androidx.preference.PreferenceManager
 import com.android.volley.NoConnectionError
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
-import com.jeanwest.mobile.MainActivity
+import com.jeanwest.mobile.manualRefill.ManualRefillActivity
 import com.jeanwest.mobile.theme.ErrorSnackBar
 import com.jeanwest.mobile.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
@@ -58,7 +59,7 @@ class UserLoginActivity : ComponentActivity() {
             editor.apply()
 
             val intent =
-                Intent(this@UserLoginActivity, MainActivity::class.java)
+                Intent(this@UserLoginActivity, ManualRefillActivity::class.java)
             intent.flags += Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
 
@@ -133,11 +134,16 @@ class UserLoginActivity : ComponentActivity() {
     @Composable
     fun Content() {
 
+        val focus = LocalFocusManager.current
+
         Column(modifier = Modifier.fillMaxSize()) {
             UsernameTextField()
             PasswordTextField()
             Button(
-                onClick = { signIn() },
+                onClick = {
+                    focus.clearFocus()
+                    signIn()
+                },
                 modifier = Modifier
                     .padding(top = 20.dp)
                     .align(Alignment.CenterHorizontally)

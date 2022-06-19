@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.jeanwest.mobile.R
-import com.jeanwest.mobile.iotHub.IotHub
 import com.jeanwest.mobile.theme.MyApplicationTheme
 import java.io.File
 
@@ -47,7 +46,7 @@ class UpdateActivity : ComponentActivity() {
 
         Toast.makeText(
             applicationContext,
-            "نسخه جدید (${IotHub.appVersion}) موجود است",
+            "نسخه جدید (${0}) موجود است",
             Toast.LENGTH_LONG
         ).show()
 
@@ -68,7 +67,7 @@ class UpdateActivity : ComponentActivity() {
         registerReceiver(
             onDownloadComplete,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-        );
+        )
     }
 
     private fun downloadApkFile() {
@@ -80,7 +79,7 @@ class UpdateActivity : ComponentActivity() {
         }
 
         val serverAddress =
-            "https://rfid-api.avakatan.ir/apk/app-debug-" + IotHub.appVersion + ".apk"
+            "https://rfid-api.avakatan.ir/apk/app-debug-" + 0 + ".apk"
         val downloadManager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
         val downloadManagerRequest = DownloadManager.Request(Uri.parse(serverAddress))
         downloadManagerRequest.setTitle("بروزرسانی RFID")
@@ -193,7 +192,7 @@ class UpdateActivity : ComponentActivity() {
                                 fontSize = 20.sp
                             )
                             Text(
-                                text = "ورژن جدید: " + IotHub.appVersion.toString(),
+                                text = "ورژن جدید: " + 0,
                                 modifier = Modifier.padding(bottom = 20.dp, top = 20.dp),
                                 fontSize = 20.sp
                             )

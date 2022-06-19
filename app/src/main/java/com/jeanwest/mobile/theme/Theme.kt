@@ -21,16 +21,14 @@ private val DarkColorPalette = darkColors(
 private val LightColorPalette = lightColors(
 
     primary = Jeanswest,
-    primaryVariant = JeanswestStatusBar,
-    background = JeanswestBackground,
-    surface = JeanswestBackground,
+    background = Background,
+    surface = Background,
     onPrimary = Color.White,
     secondaryVariant = Jeanswest,
-    onSecondary = JeanswestSelected,
     onBackground = Color.Black,
     onSurface = Color.Black,
-    secondary = JeanswestButtonDisabled,
-    error = errorColor,
+    secondary = BorderLight,
+    error = Error,
 )
 
 @Composable
